@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FarmVet AI – Livestock Disease Detection</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ── CSS Variables ─────────────────────────────────── */
+    :root {
+      --green-deep:   #1a4731;
+      --green-mid:    #2d7a4f;
+      --green-light:  #4caf7d;
+      --green-glow:   #6fcf97;
+      --amber:        #f5a623;
+      --amber-light:  #ffd166;
+      --red-alert:    #e74c3c;
+      --red-light:    #ff6b6b;
+      --sky:          #e8f5ee;
+      --white:        #ffffff;
+      --off-white:    #f4faf7;
+      --text-dark:    #0f2519;
+      --text-mid:     #3d5a47;
+      --text-muted:   #7a9a85;
+      --card-bg:      rgba(255,255,255,0.92);
+      --shadow-sm:    0 2px 12px rgba(26,71,49,0.10);
+      --shadow-md:    0 6px 28px rgba(26,71,49,0.16);
+      --shadow-lg:    0 16px 56px rgba(26,71,49,0.22);
+      --radius-sm:    10px;
+      --radius-md:    18px;
+      --radius-lg:    28px;
+      --radius-xl:    40px;
+    }
+
+    /* ── Reset ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--off-white);
+      color: var(--text-dark);
+      overflow-x: hidden;
+    }
+
+    /* ── Utility ───────────────────────────────────────── */
+    .tag {
+      display: inline-block;
+      background: rgba(77,175,125,0.15);
+      color: var(--green-mid);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid rgba(77,175,125,0.3);
+    }
+    .tag.amber { background: rgba(245,166,35,0.15); color: #b07a10; border-color: rgba(245,166,35,0.3); }
+    .tag.red   { background: rgba(231,76,60,0.12);  color: var(--red-alert); border-color: rgba(231,76,60,0.3); }
+
+    /* ── Noise texture overlay ─────────────────────────── */
+    body::before {
+      content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+      opacity: .4;
+    }
+
+    /* ── Top Nav ───────────────────────────────────────── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(26,71,49,0.97);
+      backdrop-filter: blur(14px);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 24px;
+      box-shadow: 0 2px 20px rgba(0,0,0,0.2);
+    }
+    .nav-logo {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      color: var(--white); font-size: 1.25rem; letter-spacing: -0.02em;
+    }
+    .nav-logo span { color: var(--green-glow); }
+    .nav-right { display: flex; align-items: center; gap: 10px; }
+    .lang-btn {
+      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25);
+      color: var(--white); padding: 5px 12px; border-radius: 20px;
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: background .2s;
+    }
+    .lang-btn.active { background: var(--green-glow); color: var(--green-deep); border-color: transparent; }
+    .lang-btn:hover { background: rgba(255,255,255,0.2); }
+    .lang-btn.active:hover { background: var(--green-glow); }
+
+    /* ── Hero ──────────────────────────────────────────── */
+    .hero {
+      position: relative; overflow: hidden;
+      background: linear-gradient(145deg, var(--green-deep) 0%, #1e5c3a 50%, #2d7a4f 100%);
+      padding: 64px 24px 80px;
+      text-align: center;
+    }
+    .hero-bg-circles {
+      position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+    }
+    .hero-bg-circles span {
+      position: absolute; border-radius: 50%;
+      background: radial-gradient(circle, rgba(111,207,151,0.18) 0%, transparent 70%);
+    }
+    .hero-bg-circles span:nth-child(1) { width: 400px; height: 400px; top: -120px; left: -80px; }
+    .hero-bg-circles span:nth-child(2) { width: 300px; height: 300px; bottom: -60px; right: -40px; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(111,207,151,0.15); border: 1px solid rgba(111,207,151,0.35);
+      color: var(--green-glow); font-size: 12px; font-weight: 600;
+      padding: 6px 14px; border-radius: 20px; margin-bottom: 22px;
+      letter-spacing: .04em; text-transform: uppercase;
+      animation: fadeUp .5s ease both;
+    }
+    .hero-badge::before { content: '🌿'; }
+    .hero h1 {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(2rem, 7vw, 3.2rem); line-height: 1.1;
+      color: var(--white); margin-bottom: 16px;
+      animation: fadeUp .5s .1s ease both;
+    }
+    .hero h1 em { color: var(--green-glow); font-style: normal; }
+    .hero p {
+      color: rgba(255,255,255,0.75); max-width: 520px; margin: 0 auto 32px;
+      font-size: 1rem; line-height: 1.65;
+      animation: fadeUp .5s .2s ease both;
+    }
+    .hero-cta {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: var(--green-glow); color: var(--green-deep);
+      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem;
+      padding: 14px 32px; border-radius: var(--radius-xl);
+      text-decoration: none; transition: transform .15s, box-shadow .15s;
+      box-shadow: 0 4px 24px rgba(111,207,151,0.45);
+      animation: fadeUp .5s .3s ease both;
+    }
+    .hero-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(111,207,151,0.55); }
+
+    /* ── Stats Bar ─────────────────────────────────────── */
+    .stats-bar {
+      background: var(--white);
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      border-bottom: 1px solid rgba(26,71,49,0.08);
+      box-shadow: var(--shadow-sm);
+    }
+    .stat-item {
+      padding: 20px 16px; text-align: center;
+      border-right: 1px solid rgba(26,71,49,0.08);
+    }
+    .stat-item:last-child { border-right: none; }
+    .stat-num {
+      font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.6rem;
+      color: var(--green-mid);
+    }
+    .stat-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; line-height: 1.3; }
+    .stat-note  { font-size: 9.5px; color: var(--text-muted); margin-top: 8px; font-style: italic; line-height: 1.4; opacity: .75; }
+
+    /* ── Section Wrapper ───────────────────────────────── */
+    .section { padding: 48px 24px; max-width: 640px; margin: 0 auto; }
+    .section-label {
+      font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--green-mid); margin-bottom: 8px;
+    }
+    .section-title {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(1.35rem, 4vw, 1.75rem); color: var(--text-dark);
+      margin-bottom: 6px;
+    }
+    .section-sub { font-size: .9rem; color: var(--text-muted); margin-bottom: 28px; line-height: 1.6; }
+
+    /* ── Scanner Card ──────────────────────────────────── */
+    .scanner-card {
+      background: var(--card-bg); border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md); overflow: hidden;
+    }
+
+    /* Camera Viewfinder */
+    .camera-area {
+      position: relative; aspect-ratio: 4/3; background: #0a2016;
+      overflow: hidden; cursor: pointer;
+    }
+    .camera-area img#previewImg {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; display: none;
+    }
+    .camera-placeholder {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 10px;
+      background: linear-gradient(180deg, #0f2519 0%, #1a4731 100%);
+    }
+    .camera-placeholder .cam-icon {
+      font-size: 3rem; opacity: .6;
+    }
+    .cam-instructions {
+      font-size: .8rem; color: rgba(255,255,255,0.55); text-align: center;
+      max-width: 200px; line-height: 1.5;
+    }
+
+    /* Corner brackets */
+    .cam-corner {
+      position: absolute; width: 28px; height: 28px;
+      border-color: rgba(111,207,151,0.7); border-style: solid;
+    }
+    .cam-corner.tl { top: 16px; left: 16px; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+    .cam-corner.tr { top: 16px; right: 16px; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+    .cam-corner.bl { bottom: 16px; left: 16px; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+    .cam-corner.br { bottom: 16px; right: 16px; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+
+    /* Scan line animation */
+    .scan-line {
+      position: absolute; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--green-glow), transparent);
+      box-shadow: 0 0 10px var(--green-glow);
+      animation: scanMove 2.4s ease-in-out infinite;
+      display: none;
+    }
+    @keyframes scanMove {
+      0%   { top: 10%; }
+      50%  { top: 88%; }
+      100% { top: 10%; }
+    }
+    .scanning .scan-line { display: block; }
+
+    /* Disclaimer ribbon */
+    .ai-disclaimer {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: rgba(10,32,22,0.85); backdrop-filter: blur(4px);
+      color: rgba(255,255,255,0.6); font-size: 10px; text-align: center;
+      padding: 6px 12px; line-height: 1.4;
+    }
+    .ai-disclaimer strong { color: var(--amber-light); }
+
+    /* Scanner Controls */
+    .scanner-controls { padding: 20px; }
+
+    /* Hidden file input */
+    #fileInput { display: none; }
+
+    /* Buttons row */
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .btn {
+      padding: 12px 16px; border-radius: var(--radius-md);
+      border: none; cursor: pointer; font-family: 'DM Sans', sans-serif;
+      font-weight: 500; font-size: .9rem; display: flex; align-items: center;
+      justify-content: center; gap: 7px; transition: transform .15s, box-shadow .15s;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--green-mid), var(--green-deep));
+      color: var(--white); box-shadow: 0 4px 16px rgba(45,122,79,0.4);
+    }
+    .btn-primary:hover { box-shadow: 0 6px 20px rgba(45,122,79,0.5); }
+    .btn-secondary {
+      background: rgba(45,122,79,0.1); color: var(--green-mid);
+      border: 1.5px solid rgba(45,122,79,0.25);
+    }
+    .btn-secondary:hover { background: rgba(45,122,79,0.18); }
+    .btn-full {
+      width: 100%; margin-bottom: 10px;
+      padding: 14px; font-size: 1rem; font-weight: 600; font-family: 'Syne', sans-serif;
+    }
+    .btn.loading { opacity: .7; pointer-events: none; }
+    .btn.loading::after {
+      content: '';
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: var(--white);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin-left: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Result Panel ──────────────────────────────────── */
+    .result-panel {
+      margin-top: 16px; padding: 18px; border-radius: var(--radius-md);
+      display: none; animation: fadeUp .35s ease;
+    }
+    .result-panel.show { display: block; }
+    .result-panel.normal { background: rgba(77,175,125,0.1); border: 1.5px solid rgba(77,175,125,0.35); }
+    .result-panel.warning{ background: rgba(245,166,35,0.10); border: 1.5px solid rgba(245,166,35,0.4); }
+    .result-panel.danger { background: rgba(231,76,60,0.08);  border: 1.5px solid rgba(231,76,60,0.35); }
+
+    .result-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .result-icon { font-size: 1.6rem; }
+    .result-title {
+      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1rem;
+    }
+    .result-body { font-size: .85rem; color: var(--text-mid); line-height: 1.6; }
+    .result-confidence {
+      display: flex; align-items: center; gap: 10px; margin-top: 12px;
+    }
+    .conf-bar-wrap {
+      flex: 1; height: 6px; background: rgba(0,0,0,0.08);
+      border-radius: 99px; overflow: hidden;
+    }
+    .conf-bar { height: 100%; border-radius: 99px; transition: width 1s ease; width: 0%; }
+    .conf-label { font-size: 12px; font-weight: 600; color: var(--text-mid); min-width: 40px; text-align: right; }
+    .sim-note {
+      margin-top: 10px; font-size: 10.5px; color: var(--text-muted); font-style: italic;
+      padding: 6px 10px; background: rgba(0,0,0,0.04); border-radius: 6px;
+    }
+
+    /* ── Scan History ──────────────────────────────────── */
+    .history-section { padding: 0 24px 48px; max-width: 640px; margin: 0 auto; }
+    .history-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .history-title {
+      font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.05rem; color: var(--text-dark);
+    }
+    .clear-btn {
+      font-size: 12px; color: var(--text-muted); background: none; border: none;
+      cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+    }
+    .history-list { display: flex; flex-direction: column; gap: 10px; }
+    .history-item {
+      background: var(--card-bg); border-radius: var(--radius-sm);
+      padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+      box-shadow: var(--shadow-sm); border-left: 4px solid transparent;
+      animation: fadeUp .3s ease;
+    }
+    .history-item.normal  { border-left-color: var(--green-light); }
+    .history-item.warning { border-left-color: var(--amber); }
+    .history-item.danger  { border-left-color: var(--red-alert); }
+    .history-thumb {
+      width: 46px; height: 46px; border-radius: 8px;
+      object-fit: cover; background: #dce8e0; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 1.4rem;
+    }
+    .history-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+    .history-meta { flex: 1; min-width: 0; }
+    .history-name { font-size: .85rem; font-weight: 600; color: var(--text-dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-time { font-size: .75rem; color: var(--text-muted); margin-top: 2px; }
+    .history-empty {
+      text-align: center; padding: 28px; color: var(--text-muted); font-size: .85rem;
+      background: rgba(255,255,255,0.6); border-radius: var(--radius-md);
+      border: 1.5px dashed rgba(45,122,79,0.2);
+    }
+
+    /* ── Diseases Reference ────────────────────────────── */
+    .disease-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .disease-card {
+      background: var(--card-bg); border-radius: var(--radius-md);
+      padding: 18px; box-shadow: var(--shadow-sm);
+      border-top: 3px solid var(--green-light);
+      transition: transform .2s, box-shadow .2s;
+    }
+    .disease-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+    .disease-card.critical { border-top-color: var(--red-alert); }
+    .disease-card h3 {
+      font-family: 'Syne', sans-serif; font-weight: 700;
+      font-size: .95rem; margin: 10px 0 6px; color: var(--text-dark);
+    }
+    .disease-card p { font-size: .78rem; color: var(--text-muted); line-height: 1.5; }
+    .disease-icon { font-size: 1.8rem; }
+
+    /* ── Vet Connect ───────────────────────────────────── */
+    .vet-card-wrap { display: flex; flex-direction: column; gap: 14px; }
+    .vet-card {
+      background: var(--card-bg); border-radius: var(--radius-md);
+      padding: 18px; box-shadow: var(--shadow-sm);
+      display: flex; align-items: flex-start; gap: 14px;
+    }
+    .vet-avatar {
+      width: 50px; height: 50px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--green-light), var(--green-deep));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; color: var(--white);
+    }
+    .vet-info { flex: 1; }
+    .vet-name { font-family: 'Syne', sans-serif; font-weight: 700; font-size: .95rem; color: var(--text-dark); }
+    .vet-spec { font-size: .78rem; color: var(--text-muted); margin: 2px 0 8px; }
+    .vet-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .avail-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block; flex-shrink: 0;
+    }
+    .avail-dot.green { background: #27ae60; box-shadow: 0 0 6px rgba(39,174,96,0.6); }
+    .avail-dot.red   { background: #e74c3c; }
+    .avail-dot.yellow{ background: #f5a623; }
+    .avail-text { font-size: .75rem; color: var(--text-mid); }
+    .vet-dist { font-size: .75rem; color: var(--text-muted); }
+    .call-btn {
+      margin-left: auto; padding: 8px 16px;
+      background: linear-gradient(135deg, var(--green-mid), var(--green-deep));
+      color: var(--white); border: none; border-radius: var(--radius-sm);
+      font-size: .8rem; font-weight: 600; cursor: pointer;
+      transition: opacity .2s; white-space: nowrap;
+    }
+    .call-btn:hover { opacity: .85; }
+
+    .vet-loading {
+      text-align: center; padding: 32px;
+      color: var(--text-muted); font-size: .9rem;
+    }
+    .vet-loading::before {
+      content: ''; display: block; width: 28px; height: 28px;
+      border: 3px solid rgba(45,122,79,0.2); border-top-color: var(--green-mid);
+      border-radius: 50%; animation: spin .8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    .gps-note {
+      font-size: 11px; color: var(--text-muted); text-align: center;
+      margin-top: 10px; font-style: italic; padding: 8px;
+      background: rgba(45,122,79,0.06); border-radius: 8px;
+    }
+
+    /* ── How It Works ──────────────────────────────────── */
+    .steps { display: flex; flex-direction: column; gap: 0; }
+    .step {
+      display: flex; gap: 16px; align-items: flex-start; padding: 16px 0;
+      border-bottom: 1px solid rgba(26,71,49,0.07);
+    }
+    .step:last-child { border-bottom: none; }
+    .step-num {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--green-light), var(--green-mid));
+      color: var(--white); font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: .9rem; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; box-shadow: 0 3px 10px rgba(45,122,79,0.35);
+    }
+    .step-title { font-weight: 600; font-size: .95rem; color: var(--text-dark); margin-bottom: 4px; }
+    .step-desc  { font-size: .82rem; color: var(--text-muted); line-height: 1.55; }
+
+    /* ── Footer ────────────────────────────────────────── */
+    footer {
+      background: var(--green-deep); color: rgba(255,255,255,0.65);
+      text-align: center; padding: 28px 24px; font-size: .8rem; line-height: 1.7;
+    }
+    footer strong { color: var(--green-glow); font-family: 'Syne', sans-serif; }
+    footer a { color: var(--green-glow); text-decoration: none; }
+
+    /* ── Animations ────────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Toast ─────────────────────────────────────────── */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px);
+      background: var(--green-deep); color: var(--white);
+      padding: 12px 22px; border-radius: var(--radius-xl); font-size: .875rem;
+      box-shadow: var(--shadow-lg); z-index: 999; transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 420px) {
+      .disease-grid { grid-template-columns: 1fr; }
+      .btn-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ NAV ════════════════════════════════════════════════ -->
+<nav>
+  <div class="nav-logo">FarmVet<span>AI</span></div>
+  <div class="nav-right">
+    <button class="lang-btn active" onclick="setLang('en')" id="btnEN">EN</button>
+    <button class="lang-btn" onclick="setLang('hi')" id="btnHI">हि</button>
+    <button class="lang-btn" onclick="setLang('mr')" id="btnMR">म</button>
+  </div>
+</nav>
+
+<!-- ══ HERO ═══════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="hero-bg-circles"><span></span><span></span></div>
+  <div class="hero-badge">Hackathon Prototype – AgriTech 2025</div>
+  <h1>Detect Livestock<br>Disease <em>Instantly</em></h1>
+  <p>AI-powered image scanning for early detection of LSD, FMD, and more. Built for Indian farmers — works offline, in your language.</p>
+  <a href="#scanner" class="hero-cta">🔬 Try the Scanner</a>
+</section>
+
+<!-- ══ STATS BAR ══════════════════════════════════════════ -->
+<div class="stats-bar">
+  <div class="stat-item">
+    <div class="stat-num">3</div>
+    <div class="stat-label">Diseases Detected</div>
+    <div class="stat-note">LSD · FMD · Normal</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">3</div>
+    <div class="stat-label">Languages</div>
+    <div class="stat-note">EN · HI · MR</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-num">TFLite</div>
+    <div class="stat-label">Final Model</div>
+    <div class="stat-note">Prototype accuracy simulated. Model will be trained on real datasets</div>
+  </div>
+</div>
+
+<!-- ══ SCANNER ════════════════════════════════════════════ -->
+<section class="section" id="scanner">
+  <div class="section-label">Core Feature</div>
+  <div class="section-title" id="txt-section-title">Scan Your Animal</div>
+  <div class="section-sub">Upload a photo of your livestock to get an instant AI-powered health assessment.</div>
+
+  <div class="scanner-card">
+    <!-- Camera / Preview Area -->
+    <div class="camera-area" id="cameraArea" onclick="triggerFileInput()">
+      <div class="cam-corner tl"></div>
+      <div class="cam-corner tr"></div>
+      <div class="cam-corner bl"></div>
+      <div class="cam-corner br"></div>
+      <div class="scan-line" id="scanLine"></div>
+
+      <!-- Preview of uploaded image -->
+      <img src="" id="previewImg" alt="preview" />
+
+      <!-- Default placeholder -->
+      <div class="camera-placeholder" id="camPlaceholder">
+        <div class="cam-icon">📷</div>
+        <div class="cam-instructions" id="txt-cam-instructions">Tap to upload an animal photo</div>
+      </div>
+
+      <!-- AI Disclaimer ribbon -->
+      <div class="ai-disclaimer">
+        <strong>⚠ Simulated AI</strong> — AI results are simulated for prototype. Final model will use TensorFlow Lite.
+      </div>
+    </div>
+
+    <!-- Hidden real file input -->
+    <input type="file" accept="image/*" id="fileInput" onchange="handleFileSelect(event)" />
+
+    <!-- Controls -->
+    <div class="scanner-controls">
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="triggerFileInput()">
+          🖼 <span id="txt-gallery-btn">Upload from Gallery</span>
+        </button>
+        <button class="btn btn-secondary" onclick="showToast('📷 Live camera coming in v2!')">
+          📹 Use Camera
+        </button>
+      </div>
+      <button class="btn btn-primary btn-full" id="scanBtn" onclick="startScan()">
+        🔬 <span id="txt-scan-btn">Scan for Disease</span>
+      </button>
+
+      <!-- Result Panel -->
+      <div class="result-panel" id="resultPanel">
+        <div class="result-header">
+          <div class="result-icon" id="resultIcon">✅</div>
+          <div class="result-title" id="resultTitle">No disease detected</div>
+          <div class="tag" id="resultTag" style="margin-left:auto">Normal</div>
+        </div>
+        <div class="result-body" id="resultBody">The animal appears healthy. Continue regular monitoring.</div>
+        <div class="result-confidence">
+          <div class="conf-bar-wrap">
+            <div class="conf-bar" id="confBar" style="background:var(--green-light)"></div>
+          </div>
+          <div class="conf-label" id="confLabel">—</div>
+        </div>
+        <div class="sim-note" id="txt-sim-note">
+          ⚙ Simulated result — final model will use on-device TensorFlow Lite inference on real training data.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SCAN HISTORY ══════════════════════════════════════ -->
+<div class="history-section" id="historySection">
+  <div class="history-header">
+    <div class="history-title">📋 Recent Scans</div>
+    <button class="clear-btn" onclick="clearHistory()">Clear all</button>
+  </div>
+  <div class="history-list" id="historyList">
+    <div class="history-empty" id="historyEmpty">No scans yet. Upload an image to get started.</div>
+  </div>
+</div>
+
+<!-- ══ DISEASES ═══════════════════════════════════════════ -->
+<section class="section">
+  <div class="section-label">Disease Library</div>
+  <div class="section-title">What We Detect</div>
+  <div class="section-sub">Currently trained to identify two high-priority cattle diseases in India.</div>
+  <div class="disease-grid">
+    <div class="disease-card critical">
+      <div class="disease-icon">🐄</div>
+      <h3>Lumpy Skin Disease</h3>
+      <p>Viral disease causing skin nodules. Highly contagious. Early detection saves livestock.</p>
+      <br><span class="tag red">High Risk</span>
+    </div>
+    <div class="disease-card critical">
+      <div class="disease-icon">🦷</div>
+      <h3>Foot & Mouth Disease</h3>
+      <p>Severe viral disease affecting hooves and mouth. Rapid spread in herds.</p>
+      <br><span class="tag red">High Risk</span>
+    </div>
+    <div class="disease-card">
+      <div class="disease-icon">✅</div>
+      <h3>Healthy Animal</h3>
+      <p>No visual signs of disease detected. Routine check passed successfully.</p>
+      <br><span class="tag">Normal</span>
+    </div>
+    <div class="disease-card">
+      <div class="disease-icon">🔬</div>
+      <h3>Coming Soon</h3>
+      <p>Mastitis, BRD, Ringworm — expanding the model with more datasets.</p>
+      <br><span class="tag amber">In Pipeline</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ HOW IT WORKS ═══════════════════════════════════════ -->
+<section class="section" style="padding-top:0">
+  <div class="section-label">Workflow</div>
+  <div class="section-title">How It Works</div>
+  <div class="section-sub">Three steps from photo to diagnosis — no internet required in production.</div>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div>
+        <div class="step-title">Capture or Upload</div>
+        <div class="step-desc">Take a clear photo of the affected area or upload from gallery.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div>
+        <div class="step-title">On-Device AI Analysis</div>
+        <div class="step-desc">TensorFlow Lite model runs locally — no data leaves your phone.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div>
+        <div class="step-title">Get Diagnosis + Vet</div>
+        <div class="step-desc">Receive instant results and connect to nearby government vets if needed.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ VET CONNECT ════════════════════════════════════════ -->
+<section class="section" style="padding-top:0" id="vetConnect">
+  <div class="section-label">Emergency Support</div>
+  <div class="section-title">Vet Connect</div>
+  <div class="section-sub">Find government veterinarians near you. GPS + Maps API in production.</div>
+
+  <div id="vetLoading" class="vet-loading">Fetching nearby vets...</div>
+  <div id="vetList" class="vet-card-wrap" style="display:none"></div>
+  <div class="gps-note" id="vetGpsNote" style="display:none">
+    📍 Uses GPS + Google Maps API in production. Distances are simulated for prototype.
+  </div>
+</section>
+
+<!-- ══ FOOTER ══════════════════════════════════════════════ -->
+<footer>
+  <strong>FarmVetAI</strong> — Hackathon Prototype<br>
+  Built for Indian farmers 🇮🇳 &nbsp;|&nbsp; <a href="#">Team AgroSense</a><br>
+  <small style="opacity:.6">Prototype only. Not for medical use. Final model trained on real datasets.</small>
+</footer>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   TRANSLATIONS
+═══════════════════════════════════════════════════════════ */
+const T = {
+  en: {
+    scanBtn:       "Scan for Disease",
+    galleryBtn:    "Upload from Gallery",
+    camInstructions: "Tap to upload an animal photo",
+    sectionTitle:  "Scan Your Animal",
+    simNote:       "⚙ Simulated result — final model will use on-device TensorFlow Lite inference on real training data.",
+    normal:        { title: "No Disease Detected", body: "The animal appears healthy. Continue regular monitoring and maintain hygiene standards." },
+    lsd:           { title: "Lumpy Skin Disease (LSD) Detected", body: "Visible nodules detected in the image. Isolate the animal immediately and contact a government vet. Notify local animal husbandry department." },
+    fmd:           { title: "Foot & Mouth Disease (FMD) Detected", body: "Signs consistent with FMD detected. Restrict movement, disinfect the area, and call the nearest vet urgently." },
+  },
+  hi: {
+    scanBtn:       "बीमारी की जाँच करें",
+    galleryBtn:    "गैलरी से अपलोड करें",
+    camInstructions: "पशु की फोटो अपलोड करने के लिए टैप करें",
+    sectionTitle:  "अपने पशु को स्कैन करें",
+    simNote:       "⚙ अनुमानित परिणाम — अंतिम मॉडल TensorFlow Lite पर प्रशिक्षित होगा।",
+    normal:        { title: "कोई बीमारी नहीं मिली", body: "पशु स्वस्थ दिखता है। नियमित निगरानी जारी रखें।" },
+    lsd:           { title: "गांठदार त्वचा रोग (LSD) पाया गया", body: "छवि में गांठें दिखाई दे रही हैं। पशु को तुरंत अलग करें और सरकारी पशु चिकित्सक से संपर्क करें।" },
+    fmd:           { title: "खुरपका-मुंहपका रोग (FMD) पाया गया", body: "FMD के लक्षण मिले। तुरंत पशु की आवाजाही रोकें और पशु चिकित्सक को बुलाएं।" },
+  },
+  mr: {
+    scanBtn:       "रोग तपासा",
+    galleryBtn:    "गॅलरीतून अपलोड करा",
+    camInstructions: "पशूचा फोटो अपलोड करण्यासाठी टॅप करा",
+    sectionTitle:  "आपल्या पशूला स्कॅन करा",
+    simNote:       "⚙ अनुमानित निकाल — अंतिम मॉडल TensorFlow Lite वर प्रशिक्षित होईल.",
+    normal:        { title: "कोणताही रोग आढळला नाही", body: "पशू निरोगी दिसतो आहे. नियमित देखरेख सुरू ठेवा." },
+    lsd:           { title: "लम्पी स्किन रोग (LSD) आढळला", body: "त्वचेवर गाठी दिसत आहेत. पशूला त्वरित वेगळे करा आणि पशुवैद्यकाशी संपर्क साधा." },
+    fmd:           { title: "खुरांचा-तोंडाचा रोग (FMD) आढळला", body: "FMD ची चिन्हे आढळली. त्वरित पशुवैद्यकाला बोलवा आणि हालचाल थांबवा." },
+  }
+};
+
+let currentLang = 'en';
+let selectedFileName = '';
+let selectedFileURL   = '';
+
+function setLang(lang) {
+  currentLang = lang;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn' + lang.toUpperCase()).classList.add('active');
+  applyTranslations();
+}
+
+function applyTranslations() {
+  const t = T[currentLang];
+  document.getElementById('txt-scan-btn').textContent       = t.scanBtn;
+  document.getElementById('txt-gallery-btn').textContent    = t.galleryBtn;
+  document.getElementById('txt-cam-instructions').textContent = t.camInstructions;
+  document.getElementById('txt-section-title').textContent  = t.sectionTitle;
+  document.getElementById('txt-sim-note').textContent       = t.simNote;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   FILE INPUT & PREVIEW
+═══════════════════════════════════════════════════════════ */
+function triggerFileInput() {
+  document.getElementById('fileInput').click();
+}
+
+function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  selectedFileName = file.name.toLowerCase();
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    selectedFileURL = e.target.result;
+
+    // Show preview, hide placeholder
+    const img = document.getElementById('previewImg');
+    img.src = selectedFileURL;
+    img.style.display = 'block';
+    document.getElementById('camPlaceholder').style.display = 'none';
+
+    // Auto-run scan
+    startScan();
+  };
+  reader.readAsDataURL(file);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   RULE-BASED DISEASE DETECTION
+═══════════════════════════════════════════════════════════ */
+function detectDisease(filename) {
+  if (filename.includes('lsd')) return 'lsd';
+  if (filename.includes('fmd')) return 'fmd';
+  return 'normal';
+}
+
+function getDiseaseConfig(disease) {
+  const t = T[currentLang];
+  const configs = {
+    normal: {
+      type:       'normal',
+      icon:       '✅',
+      title:      t.normal.title,
+      body:       t.normal.body,
+      tag:        'Normal',
+      tagClass:   '',
+      barColor:   'var(--green-light)',
+      conf:       92
+    },
+    lsd: {
+      type:       'warning',
+      icon:       '⚠️',
+      title:      t.lsd.title,
+      body:       t.lsd.body,
+      tag:        'LSD Alert',
+      tagClass:   'red',
+      barColor:   'var(--red-alert)',
+      conf:       87
+    },
+    fmd: {
+      type:       'danger',
+      icon:       '🚨',
+      title:      t.fmd.title,
+      body:       t.fmd.body,
+      tag:        'FMD Alert',
+      tagClass:   'red',
+      barColor:   'var(--red-light)',
+      conf:       83
+    }
+  };
+  return configs[disease] || configs.normal;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   SCAN
+═══════════════════════════════════════════════════════════ */
+function startScan() {
+  if (!selectedFileName) {
+    showToast('📂 Please select an image first');
+    triggerFileInput();
+    return;
+  }
+
+  // UI loading state
+  const btn = document.getElementById('scanBtn');
+  btn.classList.add('loading');
+  btn.querySelector('span').textContent = 'Analysing…';
+
+  const cameraArea = document.getElementById('cameraArea');
+  cameraArea.classList.add('scanning');
+
+  // Hide previous result
+  const panel = document.getElementById('resultPanel');
+  panel.classList.remove('show', 'normal', 'warning', 'danger');
+
+  // Simulate processing delay
+  setTimeout(() => {
+    const disease = detectDisease(selectedFileName);
+    const cfg     = getDiseaseConfig(disease);
+    showResult(cfg);
+    saveToHistory(cfg, selectedFileName, selectedFileURL);
+
+    btn.classList.remove('loading');
+    btn.querySelector('span').textContent = T[currentLang].scanBtn;
+    cameraArea.classList.remove('scanning');
+  }, 2200);
+}
+
+function showResult(cfg) {
+  const panel = document.getElementById('resultPanel');
+  panel.className = 'result-panel show ' + cfg.type;
+
+  document.getElementById('resultIcon').textContent  = cfg.icon;
+  document.getElementById('resultTitle').textContent = cfg.title;
+  document.getElementById('resultBody').textContent  = cfg.body;
+
+  const tagEl = document.getElementById('resultTag');
+  tagEl.textContent  = cfg.tag;
+  tagEl.className    = 'tag ' + cfg.tagClass;
+
+  const bar = document.getElementById('confBar');
+  bar.style.background = cfg.barColor;
+  bar.style.width = '0%';
+  setTimeout(() => { bar.style.width = cfg.conf + '%'; }, 50);
+
+  document.getElementById('confLabel').textContent = cfg.conf + '%';
+  document.getElementById('txt-sim-note').textContent = T[currentLang].simNote;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   SCAN HISTORY  (localStorage)
+═══════════════════════════════════════════════════════════ */
+function loadHistory() {
+  try {
+    return JSON.parse(localStorage.getItem('farmvetai_history') || '[]');
+  } catch { return []; }
+}
+
+function saveHistory(arr) {
+  localStorage.setItem('farmvetai_history', JSON.stringify(arr.slice(0, 20)));
+}
+
+function saveToHistory(cfg, filename, dataUrl) {
+  const history = loadHistory();
+  history.unshift({
+    id:       Date.now(),
+    disease:  cfg.type,
+    title:    cfg.title,
+    tag:      cfg.tag,
+    tagClass: cfg.tagClass,
+    filename: filename,
+    thumb:    dataUrl,
+    time:     new Date().toLocaleString()
+  });
+  saveHistory(history);
+  renderHistory();
+}
+
+function renderHistory() {
+  const history = loadHistory();
+  const list    = document.getElementById('historyList');
+  const empty   = document.getElementById('historyEmpty');
+
+  if (!history.length) {
+    empty.style.display = 'block';
+    list.innerHTML = '';
+    list.appendChild(empty);
+    return;
+  }
+
+  empty.style.display = 'none';
+  list.innerHTML = history.map(item => `
+    <div class="history-item ${item.disease}">
+      <div class="history-thumb">
+        ${item.thumb
+          ? `<img src="${item.thumb}" alt="scan" />`
+          : '🐄'}
+      </div>
+      <div class="history-meta">
+        <div class="history-name">${item.title}</div>
+        <div class="history-time">📁 ${item.filename} &nbsp;·&nbsp; 🕐 ${item.time}</div>
+      </div>
+      <span class="tag ${item.tagClass}">${item.tag}</span>
+    </div>
+  `).join('');
+}
+
+function clearHistory() {
+  localStorage.removeItem('farmvetai_history');
+  renderHistory();
+  showToast('🗑 History cleared');
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   VET CONNECT  (dynamic availability)
+═══════════════════════════════════════════════════════════ */
+const VET_DATA = [
+  { name: "Dr. Priya Sharma",    spec: "Cattle & Bovine Specialist",  emoji: "👩‍⚕️", dist: "1.2 km" },
+  { name: "Dr. Rajan Patil",     spec: "Government Livestock Officer", emoji: "👨‍⚕️", dist: "3.8 km" },
+  { name: "Dr. Sunita Kulkarni", spec: "Poultry & Large Animals",      emoji: "👩‍⚕️", dist: "5.1 km" },
+  { name: "Dr. Anil Deshmukh",   spec: "Dairy & Herd Health",          emoji: "👨‍⚕️", dist: "7.4 km" },
+];
+
+const AVAIL = [
+  { dot: 'green',  text: 'Available Now' },
+  { dot: 'yellow', text: 'On Call – 20 min wait' },
+  { dot: 'red',    text: 'Unavailable' },
+];
+
+function renderVets() {
+  setTimeout(() => {
+    document.getElementById('vetLoading').style.display = 'none';
+    const list = document.getElementById('vetList');
+    list.style.display = 'flex';
+    document.getElementById('vetGpsNote').style.display = 'block';
+
+    list.innerHTML = VET_DATA.map(v => {
+      const avail = AVAIL[Math.floor(Math.random() * AVAIL.length)];
+      return `
+        <div class="vet-card">
+          <div class="vet-avatar">${v.emoji}</div>
+          <div class="vet-info">
+            <div class="vet-name">${v.name}</div>
+            <div class="vet-spec">${v.spec}</div>
+            <div class="vet-meta">
+              <span class="avail-dot ${avail.dot}"></span>
+              <span class="avail-text">${avail.text}</span>
+              <span class="vet-dist">📍 ${v.dist}</span>
+            </div>
+          </div>
+          <button class="call-btn" onclick="showToast('📞 Calling ${v.name}…')">Call</button>
+        </div>
+      `;
+    }).join('');
+  }, 1800);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════════════════ */
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  applyTranslations();
+  renderHistory();
+  renderVets();
+});
+</script>
+</body>
+</html>
